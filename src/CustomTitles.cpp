@@ -98,11 +98,9 @@ public:
     {
         static ChatCommandTable customTitleCommandTable =
         {
-            { "list",    HandleCustomTitleListCommand,      SEC_PLAYER,         Console::No },
-            { "set",     HandleCustomTitleSetCommand,       SEC_PLAYER,         Console::No },
-            { "remove",  HandleCustomTitleRemoveCommand,    SEC_PLAYER,         Console::No },
+            { "list",    HandleCustomTitleListCommand,      SEC_GAMEMASTER,     Console::Yes },
             { "add",     HandleCustomTitleAddCommand,       SEC_GAMEMASTER,     Console::No },
-            { "revoke",  HandleCustomTitleRevokeCommand,    SEC_GAMEMASTER,     Console::No },
+            { "remove",  HandleCustomTitleRemoveCommand,    SEC_GAMEMASTER,     Console::No },
             { "reload",  HandleCustomTitleReloadCommand,    SEC_ADMINISTRATOR,  Console::Yes }
         };
 
@@ -114,155 +112,34 @@ public:
         return commandTable;
     }
 
-    // Команда для просмотра доступных кастомных званий
+    // Команда для просмотра всех кастомных званий (только GM)
     static bool HandleCustomTitleListCommand(ChatHandler* handler, char const* /*args*/)
     {
-        Player* player = handler->GetSession()->GetPlayer();
-
         if (customTitles.empty())
         {
             handler->PSendSysMessage("Нет доступных кастомных званий.");
             return true;
         }
 
-        handler->PSendSysMessage("=== Доступные кастомные звания ===");
+        handler->PSendSysMessage("=== Список всех кастомных званий ===");
 
         for (auto const& [id, title] : customTitles)
         {
-            std::string titleName = player->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
-            
-            bool canUse = true;
-            std::string requirements = "";
-
-            if (title.requiredLevel > 0 && player->GetLevel() < title.requiredLevel)
-            {
-                canUse = false;
-                requirements += " [Требуется уровень " + std::to_string(title.requiredLevel) + "]";
-            }
-
-            if (title.requiredAchievement > 0)
-            {
-                // Проверка достижения (можно расширить)
-                requirements += " [Требуется достижение ID: " + std::to_string(title.requiredAchievement) + "]";
-            }
-
-            if (title.requiredItem > 0 && !player->HasItemCount(title.requiredItem, 1))
-            {
-                canUse = false;
-                requirements += " [Требуется предмет ID: " + std::to_string(title.requiredItem) + "]";
-            }
-
-            if (title.cost > 0)
-            {
-                uint32 playerGold = player->GetMoney() / GOLD;
-                if (playerGold < title.cost)
-                {
-                    canUse = false;
-                }
-                requirements += " [Стоимость: " + std::to_string(title.cost) + " золота]";
-            }
-
-            std::string status = canUse ? "|cff00ff00[Доступно]|r" : "|cffff0000[Недоступно]|r";
-            handler->PSendSysMessage("ID: {} - {} {} {}", id, titleName, status, requirements);
+            handler->PSendSysMessage("ID: {} | Муж: {} | Жен: {} | Mask: {}", 
+                id, title.nameMale, title.nameFemale, title.maskId);
         }
 
-        handler->PSendSysMessage("Используйте: .ctitle set <id> для установки звания");
+        handler->PSendSysMessage("Используйте: .ctitle add <имя_игрока> <id> для выдачи звания");
+        handler->PSendSysMessage("Используйте: .ctitle remove <имя_игрока> для снятия звания");
         return true;
     }
 
-    // Команда для установки кастомного звания
-    static bool HandleCustomTitleSetCommand(ChatHandler* handler, char const* args)
-    {
-        if (!*args)
-        {
-            handler->PSendSysMessage("Использование: .ctitle set <id>");
-            return false;
-        }
-
-        uint32 titleId = atoi(args);
-        Player* player = handler->GetSession()->GetPlayer();
-
-        auto it = customTitles.find(titleId);
-        if (it == customTitles.end())
-        {
-            handler->PSendSysMessage("Звание с ID {} не найдено.", titleId);
-            return false;
-        }
-
-        CustomTitle const& title = it->second;
-
-        // Проверка требований
-        if (title.requiredLevel > 0 && player->GetLevel() < title.requiredLevel)
-        {
-            handler->PSendSysMessage("Требуется уровень {}.", title.requiredLevel);
-            return false;
-        }
-
-        if (title.requiredItem > 0 && !player->HasItemCount(title.requiredItem, 1))
-        {
-            handler->PSendSysMessage("У вас нет необходимого предмета (ID: {}).", title.requiredItem);
-            return false;
-        }
-
-        if (title.cost > 0)
-        {
-            uint32 playerGold = player->GetMoney() / GOLD;
-            if (playerGold < title.cost)
-            {
-                handler->PSendSysMessage("Недостаточно золота. Требуется: {} золота.", title.cost);
-                return false;
-            }
-
-            player->ModifyMoney(-int64(title.cost * GOLD));
-        }
-
-        // Устанавливаем битовую маску вручную в PLAYER__FIELD_KNOWN_TITLES
-        // maskId - это битовый индекс (bit_index из CharTitles.dbc)
-        if (title.maskId > 0)
-        {
-            // Устанавливаем бит в known titles
-            uint64 mask = uint64(1) << title.maskId;
-            uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64));
-            player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64), oldMask | mask);
-        }
-
-        // Снимаем активный статус со всех других титулов
-        CharacterDatabase.Execute("UPDATE character_custom_titles SET is_active = 0 WHERE guid = {}", 
-            player->GetGUID().GetCounter());
-
-        // Сохранение кастомного звания в БД персонажа и установка активным
-        CharacterDatabase.Execute(
-            "INSERT INTO character_custom_titles (guid, title_id, mask_id, is_active) "
-            "VALUES ({}, {}, {}, 1) "
-            "ON DUPLICATE KEY UPDATE is_active = 1", 
-            player->GetGUID().GetCounter(), titleId, title.maskId
-        );
-
-        std::string titleName = player->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
-        handler->PSendSysMessage("|cFFFFD700Кастомное звание установлено:|r |cFF00FF00{}|r", titleName);
-        handler->PSendSysMessage("Звание отображается в чате и при входе в игру.");
-
-        return true;
-    }
-
-    // Команда для снятия кастомного звания
-    static bool HandleCustomTitleRemoveCommand(ChatHandler* handler, char const* /*args*/)
-    {
-        Player* player = handler->GetSession()->GetPlayer();
-
-        CharacterDatabase.Execute("DELETE FROM character_custom_titles WHERE guid = {}", 
-            player->GetGUID().GetCounter());
-
-        handler->PSendSysMessage("Ваше кастомное звание снято.");
-        return true;
-    }
-
-    // GM команда для выдачи звания другому игроку
+    // Команда для выдачи кастомного звания игроку (только GM)
     static bool HandleCustomTitleAddCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
         {
-            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id_звания>");
+            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id>");
             return false;
         }
 
@@ -271,29 +148,14 @@ public:
 
         if (!nameStr || !idStr)
         {
-            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id_звания>");
+            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id>");
             return false;
         }
 
         std::string playerName = nameStr;
         uint32 titleId = atoi(idStr);
 
-        // Нормализуем имя игрока
-        if (!normalizePlayerName(playerName))
-        {
-            handler->SendSysMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
-
-        // Получаем GUID игрока по имени
-        ObjectGuid guid = sCharacterCache->GetCharacterGuidByName(playerName);
-        if (!guid)
-        {
-            handler->SendSysMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
-
-        // Проверяем существование звания
+        // Находим титул
         auto it = customTitles.find(titleId);
         if (it == customTitles.end())
         {
@@ -303,64 +165,68 @@ public:
 
         CustomTitle const& title = it->second;
 
-        // Выдаём звание игроку (без проверки требований и оплаты)
-        CharacterDatabase.Execute("REPLACE INTO character_custom_titles (guid, title_id, mask_id) VALUES ({}, {}, {})", 
-            guid.GetCounter(), titleId, title.maskId);
-
-        // Если игрок онлайн - устанавливаем битовую маску немедленно
-        if (Player* targetPlayer = ObjectAccessor::FindPlayerByName(playerName))
+        // Ищем игрока
+        Player* target = ObjectAccessor::FindPlayerByName(playerName);
+        if (!target)
         {
-            if (title.maskId > 0)
-            {
-                uint64 mask = uint64(1) << title.maskId;
-                uint64 oldMask = targetPlayer->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64));
-                targetPlayer->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64), oldMask | mask);
-            }
-
-            std::string titleName = targetPlayer->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
-            ChatHandler(targetPlayer->GetSession()).PSendSysMessage("Вы получили звание: {}", titleName);
+            handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
+            return false;
         }
 
-        handler->PSendSysMessage("Звание {} (ID: {}) выдано игроку {}.", title.nameMale, titleId, playerName);
+        // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
+        if (title.maskId > 0)
+        {
+            uint64 mask = uint64(1) << title.maskId;
+            uint64 oldMask = target->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64));
+            target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64), oldMask | mask);
+        }
+
+        // Снимаем активный статус со всех других титулов
+        CharacterDatabase.Execute("UPDATE character_custom_titles SET is_active = 0 WHERE guid = {}", 
+            target->GetGUID().GetCounter());
+
+        // Сохранение кастомного звания в БД персонажа и установка активным
+        CharacterDatabase.Execute(
+            "INSERT INTO character_custom_titles (guid, title_id, mask_id, is_active) "
+            "VALUES ({}, {}, {}, 1) "
+            "ON DUPLICATE KEY UPDATE is_active = 1", 
+            target->GetGUID().GetCounter(), titleId, title.maskId
+        );
+
+        std::string titleName = target->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
+        
+        handler->PSendSysMessage("Звание '{}' (ID: {}) выдано игроку '{}'.", titleName, titleId, playerName);
+        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700GM выдал вам кастомное звание:|r |cFF00FF00{}|r", titleName);
+
         return true;
     }
 
-    // GM команда для отзыва звания у игрока
-    static bool HandleCustomTitleRevokeCommand(ChatHandler* handler, char const* args)
+    // Команда для снятия кастомного звания у игрока (только GM)
+    static bool HandleCustomTitleRemoveCommand(ChatHandler* handler, char const* args)
     {
         if (!*args)
         {
-            handler->PSendSysMessage("Использование: .ctitle revoke <имя_игрока>");
+            handler->PSendSysMessage("Использование: .ctitle remove <имя_игрока>");
             return false;
         }
 
         std::string playerName = args;
 
-        // Нормализуем имя игрока
-        if (!normalizePlayerName(playerName))
+        // Ищем игрока
+        Player* target = ObjectAccessor::FindPlayerByName(playerName);
+        if (!target)
         {
-            handler->SendSysMessage(LANG_PLAYER_NOT_FOUND);
+            handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
             return false;
         }
 
-        // Получаем GUID игрока по имени
-        ObjectGuid guid = sCharacterCache->GetCharacterGuidByName(playerName);
-        if (!guid)
-        {
-            handler->SendSysMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
+        // Удаляем все кастомные звания игрока
+        CharacterDatabase.Execute("DELETE FROM character_custom_titles WHERE guid = {}", 
+            target->GetGUID().GetCounter());
 
-        // Удаляем звание из БД
-        CharacterDatabase.Execute("DELETE FROM character_custom_titles WHERE guid = {}", guid.GetCounter());
+        handler->PSendSysMessage("Кастомное звание игрока '{}' снято.", playerName);
+        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFF0000GM снял ваше кастомное звание.|r");
 
-        // Если игрок онлайн - уведомляем
-        if (Player* targetPlayer = ObjectAccessor::FindPlayerByName(playerName))
-        {
-            ChatHandler(targetPlayer->GetSession()).PSendSysMessage("Ваше кастомное звание отозвано администратором.");
-        }
-
-        handler->PSendSysMessage("Кастомное звание отозвано у игрока {}.", playerName);
         return true;
     }
 

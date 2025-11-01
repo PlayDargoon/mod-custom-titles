@@ -1,5 +1,4 @@
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/CustomTitles.cpp")
-AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/npc_title_vendor.cpp")
 AC_ADD_SCRIPT("${CMAKE_CURRENT_LIST_DIR}/src/loader.cpp")
 
 AC_ADD_SCRIPT_LOADER("CustomTitles" "${CMAKE_CURRENT_LIST_DIR}/src/loader.cpp")
