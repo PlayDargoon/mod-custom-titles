@@ -23,4 +23,20 @@ CustomTitles.Enable = 1
 
 CustomTitles.AnnounceOnLogin = 1
 
+#
+#    CustomTitles.ShowInChat
+#        Description: Show custom title in chat messages
+#        Default:     1 (enabled)
+#                     0 (disabled)
+
+CustomTitles.ShowInChat = 1
+
+#
+#    CustomTitles.ShowAboveHead
+#        Description: Show custom title notification above player head
+#        Default:     1 (enabled)
+#                     0 (disabled)
+
+CustomTitles.ShowAboveHead = 1
+
 ###################################################################################################
