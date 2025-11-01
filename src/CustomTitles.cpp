@@ -63,6 +63,12 @@ void LoadCustomTitles()
     LOG_INFO("module", ">> Loaded {} custom titles from custom_titles table.", count);
 }
 
+// Функция-геттер для доступа к титулам из других файлов
+std::unordered_map<uint32, CustomTitle>& GetCustomTitles()
+{
+    return customTitles;
+}
+
 // Класс для управления кастомными званиями
 class CustomTitleManager : public WorldScript
 {

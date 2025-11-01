@@ -7,6 +7,7 @@
 #define CUSTOM_TITLES_H
 
 #include <string>
+#include <unordered_map>
 
 // Структура для хранения кастомного звания
 struct CustomTitle
@@ -21,5 +22,8 @@ struct CustomTitle
     uint32 requiredItem;
     uint32 cost;
 };
+
+// Функция для получения всех кастомных титулов
+std::unordered_map<uint32, CustomTitle>& GetCustomTitles();
 
 #endif // CUSTOM_TITLES_H

@@ -13,9 +13,6 @@
 #include "DatabaseEnv.h"
 #include <unordered_map>
 
-// Внешняя переменная из CustomTitles.cpp
-extern std::unordered_map<uint32, CustomTitle> customTitles;
-
 class npc_title_vendor : public CreatureScript
 {
 public:
@@ -47,7 +44,7 @@ public:
         {
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Назад", GOSSIP_SENDER_MAIN, 0);
             
-            for (auto const& [titleId, title] : customTitles)
+            for (auto const& [titleId, title] : GetCustomTitles())
             {
                 // Рассчитываем стоимость в эмблемах (например, 1 золото = 1 эмблема)
                 uint32 emblemCost = title.cost > 0 ? title.cost : 10; // Минимум 10 эмблем
@@ -82,7 +79,7 @@ public:
         {
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Назад", GOSSIP_SENDER_MAIN, 0);
             
-            for (auto const& [titleId, title] : customTitles)
+            for (auto const& [titleId, title] : GetCustomTitles())
             {
                 std::string titleName = player->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
                 std::string gossipText = "|TInterface\\Icons\\INV_Misc_Coin_01:24:24:-15:0|t " + titleName;
@@ -130,8 +127,8 @@ public:
                     uint32 titleId = fields[0].Get<uint32>();
                     bool isActive = fields[1].Get<bool>();
 
-                    auto it = customTitles.find(titleId);
-                    if (it != customTitles.end())
+                    auto it = GetCustomTitles().find(titleId);
+                    if (it != GetCustomTitles().end())
                     {
                         std::string titleName = player->getGender() == GENDER_MALE ? it->second.nameMale : it->second.nameFemale;
                         std::string status = isActive ? " |cFF00FF00[Активен]|r" : "";
@@ -200,8 +197,8 @@ public:
 private:
     void PurchaseTitleWithEmblems(Player* player, Creature* creature, uint32 titleId)
     {
-        auto it = customTitles.find(titleId);
-        if (it == customTitles.end())
+        auto it = GetCustomTitles().find(titleId);
+        if (it == GetCustomTitles().end())
         {
             ChatHandler(player->GetSession()).PSendSysMessage("Титул не найден.");
             return;
@@ -248,8 +245,8 @@ private:
 
     void PurchaseTitleWithGold(Player* player, Creature* creature, uint32 titleId)
     {
-        auto it = customTitles.find(titleId);
-        if (it == customTitles.end())
+        auto it = GetCustomTitles().find(titleId);
+        if (it == GetCustomTitles().end())
         {
             ChatHandler(player->GetSession()).PSendSysMessage("Титул не найден.");
             return;
@@ -307,8 +304,8 @@ private:
             player->GetGUID().GetCounter(), titleId
         );
 
-        auto it = customTitles.find(titleId);
-        if (it != customTitles.end())
+        auto it = GetCustomTitles().find(titleId);
+        if (it != GetCustomTitles().end())
         {
             std::string titleName = player->getGender() == GENDER_MALE ? it->second.nameMale : it->second.nameFemale;
             ChatHandler(player->GetSession()).PSendSysMessage("|cFFFFD700Титул активирован:|r |cFF00FF00{}|r", titleName);
