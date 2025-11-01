@@ -5,8 +5,12 @@
 
 #include "ScriptMgr.h"
 #include "Player.h"
+#include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
+#include "Chat/Chat.h"
 #include "CustomTitles.h"
+#include "Config.h"
+#include "DatabaseEnv.h"
 #include <unordered_map>
 
 // Внешняя переменная из CustomTitles.cpp
@@ -16,16 +20,6 @@ class npc_title_vendor : public CreatureScript
 {
 public:
     npc_title_vendor() : CreatureScript("npc_title_vendor") { }
-
-    struct npc_title_vendorAI : public ScriptedAI
-    {
-        npc_title_vendorAI(Creature* creature) : ScriptedAI(creature) { }
-    };
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_title_vendorAI(creature);
-    }
 
     bool OnGossipHello(Player* player, Creature* creature) override
     {
