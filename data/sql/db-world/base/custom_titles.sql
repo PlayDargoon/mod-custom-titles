@@ -3,8 +3,8 @@
 -- --------------------------------------------------------
 
 -- Таблица для хранения кастомных званий (DBC-подобная структура)
-DROP TABLE IF EXISTS `chartitles_dbc`;
-CREATE TABLE `chartitles_dbc` (
+DROP TABLE IF EXISTS `custom_titles`;
+CREATE TABLE `custom_titles` (
   `ID` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Уникальный ID звания',
   `condition_ID` INT UNSIGNED DEFAULT 0 COMMENT 'ID условия',
   `name1` VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'Название (язык 1)',
@@ -50,7 +50,7 @@ CREATE TABLE `chartitles_dbc` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Таблица кастомных званий (DBC-подобная структура)';
 
 -- Примеры кастомных званий
-INSERT INTO `chartitles_dbc` VALUES 
+INSERT INTO `custom_titles` VALUES 
 (179, 9139, 'Test Title', '', '', '', '', '', '', '', '', '', '', 'Тестовое звание', '', '', '', '', 16712190, 'Test Title', '', '', '', '', '', '', '', '', '', '', 'Тестовое звание', '', '', '', '', 16712490, 144, 0, 0, 0, 0),
 (180, 9140, 'Legendary Warrior', '', '', '', '', '', '', '', '', '', '', 'Легендарный Воин', '', '', '', '', 16712190, 'Legendary Warrior', '', '', '', '', '', '', '', '', '', '', 'Легендарная Воительница', '', '', '', '', 16712490, 145, 80, 0, 0, 100),
 (181, 9141, 'Dragon Lord', '', '', '', '', '', '', '', '', '', '', 'Повелитель Драконов', '', '', '', '', 16712190, 'Dragon Lady', '', '', '', '', '', '', '', '', '', '', 'Повелительница Драконов', '', '', '', '', 16712490, 146, 70, 0, 0, 500),

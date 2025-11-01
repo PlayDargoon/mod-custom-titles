@@ -6,7 +6,7 @@
 DROP TABLE IF EXISTS `character_custom_titles`;
 CREATE TABLE `character_custom_titles` (
   `guid` INT UNSIGNED NOT NULL COMMENT 'GUID персонажа',
-  `title_id` INT UNSIGNED NOT NULL COMMENT 'ID кастомного звания из chartitles_dbc',
+  `title_id` INT UNSIGNED NOT NULL COMMENT 'ID кастомного звания из custom_titles',
   `mask_id` INT UNSIGNED NOT NULL COMMENT 'Битовый индекс звания',
   `purchased_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Дата получения звания',
   PRIMARY KEY (`guid`)

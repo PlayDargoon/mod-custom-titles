@@ -35,18 +35,18 @@ void LoadCustomTitles()
 {
     customTitles.clear();
 
-    // Загружаем данные из таблицы chartitles_dbc
+    // Загружаем данные из таблицы custom_titles
     // name13 = русское название для мужчин
     // name_female13 = русское название для женщин
     QueryResult result = WorldDatabase.Query(
         "SELECT ID, condition_ID, name13, name_female13, mask_ID, "
         "required_level, required_achievement, required_item, cost "
-        "FROM chartitles_dbc"
+        "FROM custom_titles"
     );
 
     if (!result)
     {
-        LOG_INFO("module", ">> Loaded 0 custom titles. Table `chartitles_dbc` is empty or doesn't exist.");
+        LOG_INFO("module", ">> Loaded 0 custom titles. Table `custom_titles` is empty or doesn't exist.");
         return;
     }
 
@@ -71,7 +71,7 @@ void LoadCustomTitles()
 
     } while (result->NextRow());
 
-    LOG_INFO("module", ">> Loaded {} custom titles from chartitles_dbc.", count);
+    LOG_INFO("module", ">> Loaded {} custom titles from custom_titles table.", count);
 }
 
 // Класс для управления кастомными званиями
