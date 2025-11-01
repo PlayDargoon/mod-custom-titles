@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <string>
 
+using namespace Acore::ChatCommands;
+
 // Структура для хранения кастомного звания (DBC-подобная)
 struct CustomTitle
 {
@@ -97,19 +99,19 @@ class CustomTitleCommands : public CommandScript
 public:
     CustomTitleCommands() : CommandScript("CustomTitleCommands") { }
 
-    std::vector<ChatCommand> GetCommands() override
+    ChatCommandTable GetCommands() const override
     {
-        static std::vector<ChatCommand> customTitleCommandTable =
+        static ChatCommandTable customTitleCommandTable =
         {
-            { "list",    SEC_PLAYER, false, &HandleCustomTitleListCommand,    "" },
-            { "set",     SEC_PLAYER, false, &HandleCustomTitleSetCommand,     "" },
-            { "remove",  SEC_PLAYER, false, &HandleCustomTitleRemoveCommand,  "" },
-            { "reload",  SEC_ADMINISTRATOR, true, &HandleCustomTitleReloadCommand, "" }
+            { "list",    HandleCustomTitleListCommand,    SEC_PLAYER,         Console::No },
+            { "set",     HandleCustomTitleSetCommand,     SEC_PLAYER,         Console::No },
+            { "remove",  HandleCustomTitleRemoveCommand,  SEC_PLAYER,         Console::No },
+            { "reload",  HandleCustomTitleReloadCommand, SEC_ADMINISTRATOR,  Console::Yes }
         };
 
-        static std::vector<ChatCommand> commandTable =
+        static ChatCommandTable commandTable =
         {
-            { "ctitle", SEC_PLAYER, false, nullptr, "", customTitleCommandTable }
+            { "ctitle", customTitleCommandTable }
         };
 
         return commandTable;
@@ -217,11 +219,14 @@ public:
             player->ModifyMoney(-int64(title.cost * GOLD));
         }
 
-        // Устанавливаем звание через битовую маску (как в стандартных званиях)
-        // Используем mask_ID для установки бита в PLAYER__FIELD_KNOWN_TITLES
+        // Устанавливаем битовую маску вручную в PLAYER__FIELD_KNOWN_TITLES
+        // maskId - это битовый индекс (bit_index из CharTitles.dbc)
         if (title.maskId > 0)
         {
-            player->SetTitle(title.maskId);
+            // Устанавливаем бит в known titles
+            uint64 mask = uint64(1) << title.maskId;
+            uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64));
+            player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64), oldMask | mask);
         }
 
         // Сохранение кастомного звания в БД персонажа
@@ -230,7 +235,7 @@ public:
 
         std::string titleName = player->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
         handler->PSendSysMessage("Вы получили звание: {}", titleName);
-        handler->PSendSysMessage("Используйте стандартное меню выбора званий для его активации.");
+        handler->PSendSysMessage("Звание добавлено в вашу коллекцию. Используйте стандартное меню для его выбора.");
 
         return true;
     }
@@ -289,7 +294,10 @@ public:
                     // Устанавливаем битовую маску, чтобы звание было доступно в меню
                     if (maskId > 0)
                     {
-                        player->SetTitle(maskId, false); // false = не удалять, а добавить
+                        // Устанавливаем бит в known titles при логине
+                        uint64 mask = uint64(1) << maskId;
+                        uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (maskId / 64));
+                        player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (maskId / 64), oldMask | mask);
                     }
 
                     // Опционально: уведомляем игрока
