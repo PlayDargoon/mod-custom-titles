@@ -11,48 +11,29 @@ SET @NPC_GUID := 3000001;  -- GUID для spawn (уникальный)
 DELETE FROM `creature_template` WHERE `entry` = @NPC_ENTRY;
 DELETE FROM `creature` WHERE `guid` = @NPC_GUID;
 
--- Создаём шаблон NPC
+-- Создаём шаблон NPC (минимальная версия - только обязательные поля)
 INSERT INTO `creature_template` 
-(`entry`, `difficulty_entry_1`, `difficulty_entry_2`, `difficulty_entry_3`, 
- `KillCredit1`, `KillCredit2`, `modelid1`, `modelid2`, `modelid3`, `modelid4`, 
- `name`, `subname`, `IconName`, `gossip_menu_id`, `minlevel`, `maxlevel`, 
- `exp`, `faction`, `npcflag`, `speed_walk`, `speed_run`, `scale`, 
- `rank`, `dmgschool`, `BaseAttackTime`, `RangeAttackTime`, `BaseVariance`, `RangeVariance`, 
- `unit_class`, `unit_flags`, `unit_flags2`, `dynamicflags`, `family`, `trainer_type`, 
- `trainer_spell`, `trainer_class`, `trainer_race`, `type`, `type_flags`, `lootid`, 
- `pickpocketloot`, `skinloot`, `resistance1`, `resistance2`, `resistance3`, `resistance4`, 
- `resistance5`, `resistance6`, `spell1`, `spell2`, `spell3`, `spell4`, `spell5`, `spell6`, 
- `spell7`, `spell8`, `PetSpellDataId`, `VehicleId`, `mingold`, `maxgold`, `AIName`, 
- `MovementType`, `InhabitType`, `HoverHeight`, `HealthModifier`, `ManaModifier`, 
- `ArmorModifier`, `DamageModifier`, `ExperienceModifier`, `RacialLeader`, `movementId`, 
- `RegenHealth`, `mechanic_immune_mask`, `flags_extra`, `ScriptName`, `VerifiedBuild`) 
+(`entry`, `name`, `subname`, `minlevel`, `maxlevel`, `faction`, `npcflag`, `ScriptName`) 
 VALUES 
-(@NPC_ENTRY, 0, 0, 0, 
- 0, 0, 28213, 0, 0, 0,  -- modelid1 = 28213 (Human Male Noble)
- 'Торговец Титулами', 'Кастомные Звания', NULL, 0, 80, 80, 
- 2, 35, 1, 1, 1.14286, 1, 
- 0, 0, 2000, 2000, 1, 1, 
- 1, 0, 2048, 0, 0, 0, 
- 0, 0, 0, 7, 0, 0, 
- 0, 0, 0, 0, 0, 0, 
- 0, 0, 0, 0, 0, 0, 0, 0, 
- 0, 0, 0, 0, 0, 0, '', 
- 0, 3, 1, 1, 1, 
- 1, 1, 1, 0, 0, 
- 1, 0, 0, 'npc_title_vendor', 12340);
+(@NPC_ENTRY, 'Торговец Титулами', 'Кастомные Звания', 80, 80, 35, 1, 'npc_title_vendor');
+
+-- Добавляем модель для NPC (Human Male Noble)
+DELETE FROM `creature_template_model` WHERE `CreatureID` = @NPC_ENTRY;
+INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`) VALUES
+(@NPC_ENTRY, 0, 28213, 1, 1);
 
 -- Спавним NPC в Даларане (Альянс) - Крашус Приземление
 -- Координаты: рядом с магазином эмблем
 INSERT INTO `creature` 
-(`guid`, `id`, `map`, `zoneId`, `areaId`, `spawnMask`, `phaseMask`, 
- `modelid`, `equipment_id`, `position_x`, `position_y`, `position_z`, `orientation`, 
+(`guid`, `id1`, `map`, `zoneId`, `areaId`, `spawnMask`, `phaseMask`, 
+ `equipment_id`, `position_x`, `position_y`, `position_z`, `orientation`, 
  `spawntimesecs`, `wander_distance`, `currentwaypoint`, `curhealth`, `curmana`, 
- `MovementType`, `npcflag`, `unit_flags`, `dynamicflags`, `ScriptName`, `VerifiedBuild`) 
+ `MovementType`, `npcflag`, `unit_flags`, `dynamicflags`, `VerifiedBuild`) 
 VALUES 
 (@NPC_GUID, @NPC_ENTRY, 571, 4395, 4560, 1, 1, 
- 0, 0, 5822.15, 589.19, 660.94, 1.88, 
+ 0, 5822.15, 589.19, 660.94, 1.88, 
  300, 0, 0, 12600, 0, 
- 0, 1, 0, 0, '', 12340);
+ 0, 1, 0, 0, 12340);
 
 -- Проверка
 SELECT 
@@ -64,7 +45,7 @@ SELECT
     c.position_z,
     c.map
 FROM creature_template ct
-JOIN creature c ON c.id = ct.entry
+LEFT JOIN creature c ON c.id1 = ct.entry
 WHERE ct.entry = @NPC_ENTRY;
 
 -- ========================================================
