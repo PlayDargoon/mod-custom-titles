@@ -16,27 +16,27 @@
 CustomTitles.Enable = 1
 
 #
-#    CustomTitles.AnnounceOnLogin
-#        Description: Announce custom title on player login
+#    CustomTitles.AnnounceModuleOnLogin
+#        Description: Show message that Custom Titles module is enabled when player logs in
 #        Default:     1 (enabled)
 #                     0 (disabled)
 
-CustomTitles.AnnounceOnLogin = 1
+CustomTitles.AnnounceModuleOnLogin = 1
 
 #
-#    CustomTitles.ShowInChat
-#        Description: Show custom title in chat messages
+#    CustomTitles.ServerAnnouncement
+#        Description: Broadcast server-wide announcement when player receives a title
 #        Default:     1 (enabled)
 #                     0 (disabled)
 
-CustomTitles.ShowInChat = 1
+CustomTitles.ServerAnnouncement = 1
 
 #
-#    CustomTitles.ShowAboveHead
-#        Description: Show custom title notification above player head
+#    CustomTitles.SendMail
+#        Description: Send congratulations mail to player when they receive a title
 #        Default:     1 (enabled)
 #                     0 (disabled)
 
-CustomTitles.ShowAboveHead = 1
+CustomTitles.SendMail = 1
 
 ###################################################################################################

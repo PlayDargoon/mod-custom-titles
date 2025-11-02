@@ -11,6 +11,7 @@
 #include "ObjectAccessor.h"
 #include "CharacterCache.h"
 #include "CustomTitles.h"
+#include "Mail.h"
 #include <unordered_map>
 #include <string>
 
@@ -69,6 +70,63 @@ std::unordered_map<uint32, CustomTitle>& GetCustomTitles()
     return customTitles;
 }
 
+// Функция отправки письма при получении звания
+void SendTitleMail(Player* player, uint32 titleId, std::string const& titleName)
+{
+    // Загружаем шаблон письма из базы данных
+    QueryResult result = WorldDatabase.Query("SELECT mail_subject, mail_body FROM custom_title_mails WHERE title_id = {}", titleId);
+    
+    std::string subject = "Поздравляем с получением звания!";
+    std::string body = "";
+    
+    if (result)
+    {
+        Field* fields = result->Fetch();
+        subject = fields[0].Get<std::string>();
+        body = fields[1].Get<std::string>();
+        
+        // Заменяем плейсхолдеры на реальные значения
+        size_t pos = 0;
+        while ((pos = body.find("{PLAYER_NAME}", pos)) != std::string::npos)
+        {
+            body.replace(pos, 13, player->GetName());
+            pos += player->GetName().length();
+        }
+        
+        pos = 0;
+        while ((pos = body.find("{TITLE_NAME}", pos)) != std::string::npos)
+        {
+            body.replace(pos, 12, titleName);
+            pos += titleName.length();
+        }
+        
+        // Заменяем \n на реальные переносы строк
+        pos = 0;
+        while ((pos = body.find("\\n", pos)) != std::string::npos)
+        {
+            body.replace(pos, 2, "\n");
+            pos += 1;
+        }
+    }
+    else
+    {
+        // Если шаблон не найден, используем стандартное сообщение
+        body = "Поздравляем, " + player->GetName() + "!\n\n"
+               "Тебе присвоено почетное звание " + titleName + ".\n\n"
+               "Твои заслуги навсегда останутся в памяти этого мира!\n\n"
+               "С уважением,\nКоманда Azeroth";
+        
+        LOG_WARN("module", "Mail template not found for title ID {}. Using default template.", titleId);
+    }
+    
+    // Отправляем письмо
+    MailSender sender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM);
+    MailDraft draft(subject, body);
+    draft.SendMailTo(MailReceiver(player), sender);
+    
+    LOG_INFO("module", "Title mail sent to player {} for title ID {}", player->GetName(), titleId);
+}
+
 // Класс для управления кастомными званиями
 class CustomTitleManager : public WorldScript
 {
@@ -98,7 +156,6 @@ public:
     {
         static ChatCommandTable customTitleCommandTable =
         {
-            { "list",    HandleCustomTitleListCommand,      SEC_GAMEMASTER,     Console::Yes },
             { "add",     HandleCustomTitleAddCommand,       SEC_GAMEMASTER,     Console::No },
             { "remove",  HandleCustomTitleRemoveCommand,    SEC_GAMEMASTER,     Console::No },
             { "reload",  HandleCustomTitleReloadCommand,    SEC_ADMINISTRATOR,  Console::Yes }
@@ -112,48 +169,56 @@ public:
         return commandTable;
     }
 
-    // Команда для просмотра всех кастомных званий (только GM)
-    static bool HandleCustomTitleListCommand(ChatHandler* handler, char const* /*args*/)
-    {
-        if (customTitles.empty())
-        {
-            handler->PSendSysMessage("Нет доступных кастомных званий.");
-            return true;
-        }
-
-        handler->PSendSysMessage("=== Список всех кастомных званий ===");
-
-        for (auto const& [id, title] : customTitles)
-        {
-            handler->PSendSysMessage("ID: {} | Муж: {} | Жен: {} | Mask: {}", 
-                id, title.nameMale, title.nameFemale, title.maskId);
-        }
-
-        handler->PSendSysMessage("Используйте: .ctitle add <имя_игрока> <id> для выдачи звания");
-        handler->PSendSysMessage("Используйте: .ctitle remove <имя_игрока> для снятия звания");
-        return true;
-    }
-
     // Команда для выдачи кастомного звания игроку (только GM)
     static bool HandleCustomTitleAddCommand(ChatHandler* handler, char const* args)
     {
+        Player* target = nullptr;
+        std::string playerName;
+        uint32 titleId = 0;
+
+        // Если нет аргументов - пытаемся взять таргет
         if (!*args)
         {
-            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id>");
+            target = handler->getSelectedPlayerOrSelf();
+            if (!target)
+            {
+                handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id> или возьмите игрока в таргет и используйте .ctitle add <id>");
+                return false;
+            }
+            handler->PSendSysMessage("Использование: .ctitle add <id> для выбранного игрока или .ctitle add <имя_игрока> <id>");
             return false;
         }
 
         char* nameStr = strtok((char*)args, " ");
         char* idStr = strtok(nullptr, " ");
 
-        if (!nameStr || !idStr)
+        // Если только один аргумент - это ID для таргета
+        if (!idStr)
         {
-            handler->PSendSysMessage("Использование: .ctitle add <имя_игрока> <id>");
-            return false;
+            titleId = atoi(nameStr);
+            target = handler->getSelectedPlayerOrSelf();
+            
+            if (!target)
+            {
+                handler->PSendSysMessage("Возьмите игрока в таргет или укажите имя: .ctitle add <имя_игрока> <id>");
+                return false;
+            }
+            
+            playerName = target->GetName();
         }
-
-        std::string playerName = nameStr;
-        uint32 titleId = atoi(idStr);
+        else
+        {
+            // Два аргумента - имя и ID
+            playerName = nameStr;
+            titleId = atoi(idStr);
+            target = ObjectAccessor::FindPlayerByName(playerName);
+            
+            if (!target)
+            {
+                handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
+                return false;
+            }
+        }
 
         // Находим титул
         auto it = customTitles.find(titleId);
@@ -164,14 +229,6 @@ public:
         }
 
         CustomTitle const& title = it->second;
-
-        // Ищем игрока
-        Player* target = ObjectAccessor::FindPlayerByName(playerName);
-        if (!target)
-        {
-            handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
-            return false;
-        }
 
         // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
         if (title.maskId > 0)
@@ -195,8 +252,26 @@ public:
 
         std::string titleName = target->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
         
+        // Сообщение GM
         handler->PSendSysMessage("Звание '{}' (ID: {}) выдано игроку '{}'.", titleName, titleId, playerName);
-        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700GM выдал вам кастомное звание:|r |cFF00FF00{}|r", titleName);
+        
+        // Сообщение игроку
+        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700Поздравляем, {}!|r", target->GetName());
+        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700Вы заслужили звание:|r |cFFFF8000{}|r", titleName);
+        
+        // Анонс на весь сервер (если включено в конфиге)
+        if (sConfigMgr->GetOption<bool>("CustomTitles.ServerAnnouncement", true))
+        {
+            std::string announcement = "|cFFFF0000[Серверное объявление]|r |cFFFFD700" + std::string(target->GetName()) + 
+                                       " заслужил(а) звание:|r |cFFFF8000" + titleName + "|r";
+            sWorld->SendServerMessage(SERVER_MSG_STRING, announcement.c_str());
+        }
+
+        // Отправка поздравительного письма игроку (если включено в конфиге)
+        if (sConfigMgr->GetOption<bool>("CustomTitles.SendMail", true))
+        {
+            SendTitleMail(target, titleId, titleName);
+        }
 
         return true;
     }
@@ -204,20 +279,31 @@ public:
     // Команда для снятия кастомного звания у игрока (только GM)
     static bool HandleCustomTitleRemoveCommand(ChatHandler* handler, char const* args)
     {
+        Player* target = nullptr;
+        std::string playerName;
+
+        // Если нет аргументов - берём таргет
         if (!*args)
         {
-            handler->PSendSysMessage("Использование: .ctitle remove <имя_игрока>");
-            return false;
+            target = handler->getSelectedPlayerOrSelf();
+            if (!target)
+            {
+                handler->PSendSysMessage("Использование: .ctitle remove <имя_игрока> или возьмите игрока в таргет");
+                return false;
+            }
+            playerName = target->GetName();
         }
-
-        std::string playerName = args;
-
-        // Ищем игрока
-        Player* target = ObjectAccessor::FindPlayerByName(playerName);
-        if (!target)
+        else
         {
-            handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
-            return false;
+            // Аргумент указан - ищем по имени
+            playerName = args;
+            target = ObjectAccessor::FindPlayerByName(playerName);
+            
+            if (!target)
+            {
+                handler->PSendSysMessage("Игрок '{}' не найден или не в сети.", playerName);
+                return false;
+            }
         }
 
         // Удаляем все кастомные звания игрока
@@ -278,14 +364,14 @@ public:
                         player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (maskId / 64), oldMask | mask);
                     }
 
-                    // Опционально: уведомляем игрока
-                    if (sConfigMgr->GetOption<bool>("CustomTitles.AnnounceOnLogin", true))
-                    {
-                        std::string titleName = player->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
-                        ChatHandler(player->GetSession()).PSendSysMessage("У вас есть кастомное звание: {}", titleName);
-                    }
                 }
             } while (result->NextRow());
+            
+                // Опционально: уведомляем игрока о модуле (один раз после загрузки всех званий)
+                if (sConfigMgr->GetOption<bool>("CustomTitles.AnnounceModuleOnLogin", true))
+                {
+                    ChatHandler(player->GetSession()).PSendSysMessage("|cFF00FF00[Custom Titles]|r Модуль кастомных званий активен!");
+                }
         }
     }
 };
