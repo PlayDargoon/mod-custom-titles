@@ -260,6 +260,18 @@ public:
         }
 
         CustomTitle const& title = it->second;
+        
+        // Проверяем валидность названий
+        if (title.nameMale.empty() && title.nameFemale.empty())
+        {
+            handler->PSendSysMessage("Ошибка: звание ID {} не имеет названия.", titleId);
+            return false;
+        }
+
+        // Получаем название заранее, до любых операций с БД
+        std::string titleName = target->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
+        if (titleName.empty())
+            titleName = !title.nameMale.empty() ? title.nameMale : title.nameFemale;
 
         // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
         if (title.maskId > 0)
@@ -276,15 +288,16 @@ public:
             "ON DUPLICATE KEY UPDATE is_active = 1", 
             target->GetGUID().GetCounter(), titleId, title.maskId
         );
-
-        std::string titleName = target->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
         
         // Сообщение GM
         handler->PSendSysMessage("Звание '{}' (ID: {}) выдано игроку '{}'.", titleName, titleId, playerName);
         
-        // Сообщение игроку
-        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700Поздравляем, {}!|r", target->GetName());
-        ChatHandler(target->GetSession()).PSendSysMessage("|cFFFFD700Вы заслужили звание:|r |cFFFF8000{}|r", titleName);
+        // Сообщение игроку (проверяем сессию)
+        if (WorldSession* session = target->GetSession())
+        {
+            ChatHandler(session).PSendSysMessage("|cFFFFD700Поздравляем, {}!|r", target->GetName());
+            ChatHandler(session).PSendSysMessage("|cFFFFD700Вы заслужили звание:|r |cFFFF8000{}|r", titleName);
+        }
         
         // Анонс на весь сервер (если включено в конфиге)
         if (sConfigMgr->GetOption<bool>("CustomTitles.ServerAnnouncement", true))
