@@ -46,6 +46,8 @@ static void SetKnownTitleBit(Player* player, uint32 maskId)
 void LoadCustomTitles()
 {
     customTitles.clear();
+    
+    LOG_INFO("module", "CustomTitles: Starting to load from database...");
 
     // Загружаем данные из таблицы custom_titles
     // name13 = русское название для мужчин
@@ -58,7 +60,8 @@ void LoadCustomTitles()
 
     if (!result)
     {
-        LOG_INFO("module", ">> Loaded 0 custom titles. Table `custom_titles` is empty or doesn't exist.");
+        LOG_ERROR("module", ">> CustomTitles: Failed to load! Table `custom_titles` is empty or doesn't exist!");
+        LOG_ERROR("module", ">> Please apply SQL: modules/mod-custom-titles/data/sql/db-world/base/custom_titles.sql");
         return;
     }
 
@@ -80,10 +83,17 @@ void LoadCustomTitles()
 
         customTitles[title.id] = title;
         count++;
+        
+        // Логируем первые 3 звания для диагностики
+        if (count <= 3)
+        {
+            LOG_INFO("module", "  - Loaded title ID {}: '{}' / '{}' (mask_ID: {})", 
+                     title.id, title.nameMale, title.nameFemale, title.maskId);
+        }
 
     } while (result->NextRow());
 
-    LOG_INFO("module", ">> Loaded {} custom titles from custom_titles table.", count);
+    LOG_INFO("module", ">> Successfully loaded {} custom titles from custom_titles table.", count);
 }
 
 // Функция-геттер для доступа к титулам из других файлов
@@ -251,27 +261,34 @@ public:
             }
         }
 
+        // Проверяем, что звания загружены
+        if (customTitles.empty())
+        {
+            handler->PSendSysMessage("Ошибка: звания не загружены. Всего в кэше: 0. Используйте .ctitle reload");
+            return false;
+        }
+
         // Находим титул
         auto it = customTitles.find(titleId);
         if (it == customTitles.end())
         {
-            handler->PSendSysMessage("Звание с ID {} не найдено.", titleId);
+            handler->PSendSysMessage("Ошибка: звание ID {} не найдено. Всего загружено: {}. Используйте .ctitle reload", 
+                                     titleId, customTitles.size());
             return false;
         }
 
         CustomTitle const& title = it->second;
-        
-        // Проверяем валидность названий
-        if (title.nameMale.empty() && title.nameFemale.empty())
-        {
-            handler->PSendSysMessage("Ошибка: звание ID {} не имеет названия.", titleId);
-            return false;
-        }
 
         // Получаем название заранее, до любых операций с БД
         std::string titleName = target->getGender() == GENDER_MALE ? title.nameMale : title.nameFemale;
+        
+        // Если для текущего пола название пустое, используем альтернативное
         if (titleName.empty())
             titleName = !title.nameMale.empty() ? title.nameMale : title.nameFemale;
+        
+        // Если всё ещё пустое, используем ID как fallback
+        if (titleName.empty())
+            titleName = "Custom Title #" + std::to_string(titleId);
 
         // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
         if (title.maskId > 0)
