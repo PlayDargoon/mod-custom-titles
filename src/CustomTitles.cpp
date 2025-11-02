@@ -14,6 +14,8 @@
 #include "Mail.h"
 #include <unordered_map>
 #include <string>
+#include <sstream>
+#include <cstdlib>
 
 using namespace Acore::ChatCommands;
 
@@ -199,7 +201,7 @@ public:
         uint32 titleId = 0;
 
         // Если нет аргументов - пытаемся взять таргет
-        if (!*args)
+        if (!args || !*args)
         {
             target = handler->getSelectedPlayerOrSelf();
             if (!target)
@@ -211,13 +213,20 @@ public:
             return false;
         }
 
-        char* nameStr = strtok((char*)args, " ");
-        char* idStr = strtok(nullptr, " ");
+        // Безопасный парсинг аргументов без модификации исходной строки
+        std::string input(args);
+        std::istringstream iss(input);
+        std::string firstToken;
+        std::string secondToken;
+        iss >> firstToken;
+        if (!firstToken.empty())
+            iss >> secondToken;
 
         // Если только один аргумент - это ID для таргета
-        if (!idStr)
+        if (secondToken.empty())
         {
-            titleId = atoi(nameStr);
+            // Формат: .ctitle add <id> (для выбранного таргета)
+            titleId = static_cast<uint32>(strtoul(firstToken.c_str(), nullptr, 10));
             target = handler->getSelectedPlayerOrSelf();
             
             if (!target)
@@ -231,8 +240,8 @@ public:
         else
         {
             // Два аргумента - имя и ID
-            playerName = nameStr;
-            titleId = atoi(idStr);
+            playerName = firstToken;
+            titleId = static_cast<uint32>(strtoul(secondToken.c_str(), nullptr, 10));
             target = ObjectAccessor::FindPlayerByName(playerName);
             
             if (!target)
