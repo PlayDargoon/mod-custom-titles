@@ -20,6 +20,26 @@ using namespace Acore::ChatCommands;
 // Глобальное хранилище кастомных званий
 std::unordered_map<uint32, CustomTitle> customTitles;
 
+// Вспомогательная функция: безопасно установить бит известного звания у игрока
+static void SetKnownTitleBit(Player* player, uint32 maskId)
+{
+    if (!player || maskId == 0)
+        return;
+
+    // В 3.3.5 у игрока 3 64-битных слота для званий (0..191)
+    uint32 index = maskId / 64;   // слот 0..2
+    uint32 bitPos = maskId % 64;  // позиция 0..63
+    if (index >= 3)
+    {
+        LOG_WARN("module", "CustomTitles: maskId {} is out of range (index {}). Skipping bit set.", maskId, index);
+        return;
+    }
+
+    uint64 mask = uint64(1) << bitPos;
+    uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index);
+    player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index, oldMask | mask);
+}
+
 // Загрузка кастомных званий из базы данных
 void LoadCustomTitles()
 {
@@ -234,13 +254,7 @@ public:
 
         // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
         if (title.maskId > 0)
-        {
-            uint32 index = title.maskId / 64;           // номер 64-битного блока
-            uint32 bitPos = title.maskId % 64;          // позиция бита внутри блока
-            uint64 mask = uint64(1) << bitPos;          // безопасный сдвиг внутри 0..63
-            uint64 oldMask = target->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index);
-            target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index, oldMask | mask);
-        }
+            SetKnownTitleBit(target, title.maskId);
 
         // Снимаем активный статус со всех других титулов
         CharacterDatabase.Execute("UPDATE character_custom_titles SET is_active = 0 WHERE guid = {}", 
@@ -362,12 +376,8 @@ public:
                     // Устанавливаем битовую маску, чтобы звание было доступно в меню
                     if (maskId > 0)
                     {
-                        // Устанавливаем бит в known titles при логине (безопасный сдвиг)
-                        uint32 index = maskId / 64;
-                        uint32 bitPos = maskId % 64;
-                        uint64 mask = uint64(1) << bitPos;
-                        uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index);
-                        player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index, oldMask | mask);
+                        // Устанавливаем бит в known titles при логине (безопасно)
+                        SetKnownTitleBit(player, maskId);
                     }
 
                 }
