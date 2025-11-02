@@ -235,9 +235,11 @@ public:
         // Устанавливаем битовую маску в PLAYER__FIELD_KNOWN_TITLES
         if (title.maskId > 0)
         {
-            uint64 mask = uint64(1) << title.maskId;
-            uint64 oldMask = target->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64));
-            target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (title.maskId / 64), oldMask | mask);
+            uint32 index = title.maskId / 64;           // номер 64-битного блока
+            uint32 bitPos = title.maskId % 64;          // позиция бита внутри блока
+            uint64 mask = uint64(1) << bitPos;          // безопасный сдвиг внутри 0..63
+            uint64 oldMask = target->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index);
+            target->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index, oldMask | mask);
         }
 
         // Снимаем активный статус со всех других титулов
@@ -360,10 +362,12 @@ public:
                     // Устанавливаем битовую маску, чтобы звание было доступно в меню
                     if (maskId > 0)
                     {
-                        // Устанавливаем бит в known titles при логине
-                        uint64 mask = uint64(1) << maskId;
-                        uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (maskId / 64));
-                        player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + (maskId / 64), oldMask | mask);
+                        // Устанавливаем бит в known titles при логине (безопасный сдвиг)
+                        uint32 index = maskId / 64;
+                        uint32 bitPos = maskId % 64;
+                        uint64 mask = uint64(1) << bitPos;
+                        uint64 oldMask = player->GetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index);
+                        player->SetUInt64Value(PLAYER__FIELD_KNOWN_TITLES + index, oldMask | mask);
                     }
 
                 }
