@@ -118,11 +118,12 @@ void SendTitleMail(Player* player, uint32 titleId, std::string const& titleName)
         body = fields[1].Get<std::string>();
         
         // Заменяем плейсхолдеры на реальные значения
+        std::string playerName = player->GetName();
         size_t pos = 0;
         while ((pos = body.find("{PLAYER_NAME}", pos)) != std::string::npos)
         {
-            body.replace(pos, 13, player->GetName());
-            pos += player->GetName().length();
+            body.replace(pos, 13, playerName);
+            pos += playerName.length();
         }
         
         pos = 0;
@@ -143,7 +144,8 @@ void SendTitleMail(Player* player, uint32 titleId, std::string const& titleName)
     else
     {
         // Если шаблон не найден, используем стандартное сообщение
-        body = "Поздравляем, " + player->GetName() + "!\n\n"
+        std::string playerName = player->GetName();
+        body = "Поздравляем, " + playerName + "!\n\n"
                "Тебе присвоено почетное звание " + titleName + ".\n\n"
                "Твои заслуги навсегда останутся в памяти этого мира!\n\n"
                "С уважением,\nКоманда Azeroth";
@@ -306,22 +308,25 @@ public:
             target->GetGUID().GetCounter(), titleId, title.maskId
         );
         
+        // Сохраняем имя игрока для всех последующих операций
+        std::string targetName = target->GetName();
+        
         // Сообщение GM
         handler->PSendSysMessage("Звание '{}' (ID: {}) выдано игроку '{}'.", titleName, titleId, playerName);
         
         // Сообщение игроку (проверяем сессию)
         if (WorldSession* session = target->GetSession())
         {
-            ChatHandler(session).PSendSysMessage("|cFFFFD700Поздравляем, {}!|r", target->GetName());
-            ChatHandler(session).PSendSysMessage("|cFFFFD700Вы заслужили звание:|r |cFFFF8000{}|r", titleName);
+            ChatHandler(session).PSendSysMessage("|cFFFFD700Поздравляем, {}!|r", targetName.c_str());
+            ChatHandler(session).PSendSysMessage("|cFFFFD700Вы заслужили звание:|r |cFFFF8000{}|r", titleName.c_str());
         }
         
         // Анонс на весь сервер (если включено в конфиге)
         if (sConfigMgr->GetOption<bool>("CustomTitles.ServerAnnouncement", true))
         {
-            std::string announcement = "|cFFFF0000[Серверное объявление]|r |cFFFFD700" + std::string(target->GetName()) + 
+            std::string announcement = "|cFFFF0000[Серверное объявление]|r |cFFFFD700" + targetName + 
                                        " заслужил(а) звание:|r |cFFFF8000" + titleName + "|r";
-            ChatHandler(nullptr).SendWorldText(announcement);
+            ChatHandler(nullptr).SendWorldText(announcement.c_str());
         }
 
         // Отправка поздравительного письма игроку (если включено в конфиге)
