@@ -122,7 +122,9 @@ void SendTitleMail(Player* player, uint32 titleId, std::string const& titleName)
     // Отправляем письмо
     MailSender sender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM);
     MailDraft draft(subject, body);
-    draft.SendMailTo(MailReceiver(player), sender);
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+    draft.SendMailTo(trans, MailReceiver(player), sender, MAIL_CHECK_MASK_NONE, 0, 0, false, true);
+    CharacterDatabase.CommitTransaction(trans);
     
     LOG_INFO("module", "Title mail sent to player {} for title ID {}", player->GetName(), titleId);
 }
@@ -264,7 +266,7 @@ public:
         {
             std::string announcement = "|cFFFF0000[Серверное объявление]|r |cFFFFD700" + std::string(target->GetName()) + 
                                        " заслужил(а) звание:|r |cFFFF8000" + titleName + "|r";
-            sWorld->SendServerMessage(SERVER_MSG_STRING, announcement.c_str());
+            ChatHandler(nullptr).SendWorldText(announcement);
         }
 
         // Отправка поздравительного письма игроку (если включено в конфиге)
@@ -366,12 +368,12 @@ public:
 
                 }
             } while (result->NextRow());
-            
-                // Опционально: уведомляем игрока о модуле (один раз после загрузки всех званий)
-                if (sConfigMgr->GetOption<bool>("CustomTitles.AnnounceModuleOnLogin", true))
-                {
-                    ChatHandler(player->GetSession()).PSendSysMessage("|cFF00FF00[Custom Titles]|r Модуль кастомных званий активен!");
-                }
+        }
+        
+        // Опционально: уведомляем игрока о модуле (один раз при входе)
+        if (sConfigMgr->GetOption<bool>("CustomTitles.AnnounceModuleOnLogin", true))
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage("|cFF00FF00[Custom Titles]|r Модуль кастомных званий активен!");
         }
     }
 };
